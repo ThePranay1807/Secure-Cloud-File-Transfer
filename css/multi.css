@@ -1,0 +1,95 @@
+
+    body {
+      background-color: #f4f6f8;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 30px;
+    }
+
+    form {
+      background-color: #fff;
+      padding: 25px 30px;
+      margin-bottom: 30px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      width: 400px;
+      text-align: center;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 15px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background-color: #007bff;
+      color: white;
+      font-weight: bold;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    .file-list {
+      text-align: left;
+      margin-top: 20px;
+    }
+
+    .file-list div {
+      padding: 10px;
+      border: 1px solid #e0e0e0;
+      margin-bottom: 10px;
+      border-radius: 5px;
+      background-color: #fafafa;
+    }
+
+    .file-list input[type="checkbox"] {
+      margin-right: 10px;
+    }
+
+    p {
+      color: #e53935;
+      font-weight: bold;
+    }
+    .file-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  text-align: left;
+}
+
+.file-table th,
+.file-table td {
+  padding: 12px;
+  border-bottom: 1px solid #ddd;
+}
+
+.file-table th {
+  background-color: #f2f2f2;
+  font-weight: bold;
+}
+
+.file-table input[type="checkbox"] {
+  transform: scale(1.2);
+}
+
+

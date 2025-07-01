@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Secure File Transfer</title>
+  <link rel="stylesheet" href="/css/layout.css">
+</head>
+<body>
+
+  <!-- Header Section -->
+  <div class="header">
+    <div class="project-name">Secure File Transfer</div>
+    <div class="top-bar">
+      <a href="/multi_download" class="button-link">Download Multiple Files</a>
+    </div>
+  </div>
+
+  <!-- Main Content Split -->
+  <div class="main-container">
+    <!-- Upload Section -->
+    <div class="upload-section">
+      <h2>Upload a File</h2>
+      <form action="/upload" method="POST" enctype="multipart/form-data">
+        <input type="file" name="file" required />
+        <input type="number" name="limit" min="1" max="10" placeholder="Download Limit" required />
+        <button type="submit">Upload</button>
+      </form>
+
+      <% if (uploadedKey) { %>
+        <p><strong>Secure Key for this file:</strong> <%= uploadedKey %></p>
+      <% } %>
+    </div>
+
+    <!-- Download Section -->
+    <div class="download-section">
+      <h2>Download File</h2>
+      <form action="/download" method="POST">
+        <input type="text" name="secure_key" placeholder="Enter Secure Key" required />
+        <button type="submit">Download</button>
+      </form>
+
+      <% if (fileFound === 'notfound') { %>
+        <p class="error">❌ File not found for the entered secure key.</p>
+      <% } %>
+    </div>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head><title>Multi File Download</title>
+<link rel="stylesheet" href="/css/multi.css">
+</head>
+<body>
+  <h1>Multi File Download</h1>
+
+  <form action="/fetch-files" method="POST">
+    <input type="text" name="personal_key" placeholder="Enter Your Personal Key" required />
+    <button type="submit">Fetch Files</button>
+  </form>
+
+  <% if (fetched && files.length === 0) { %>
+  <p>No files found for this personal key.</p>
+<% } else if (files && files.length > 0) { %>
+  <form action="/download-selected" method="POST">
+    <table class="file-table">
+      <thead>
+        <tr>
+          <th>Select</th>
+          <th>Filename</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% files.forEach(file => { %>
+          <tr>
+            <td>
+              <input type="checkbox" name="selectedFiles" value="<%= file.filepath %>" />
+            </td>
+            <td><%= file.filename %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+    <button type="submit">Download Selected as ZIP</button>
+  </form>
+<% } %>
+
+</body>
+</html>
