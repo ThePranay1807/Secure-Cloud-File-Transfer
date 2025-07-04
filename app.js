@@ -16,7 +16,8 @@ const app = express();
 const port = 3000;
 
 // Middleware
-app.use(bodyParser.urlencoded({ extended: false }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use('/css', express.static(path.join(__dirname, 'css')));
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -30,7 +31,7 @@ app.use(session({
 const db = mysql.createConnection({
   host: 'localhost',
   user: 'root',
-  password: 'Mysql@1807',
+  password: 'Saurabh@9854',
   database: 'trial'
 });
 
@@ -71,22 +72,28 @@ app.post('/Signup', (req, res) => {
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
   db.query(`SELECT * FROM users WHERE username = ?`, [username], (err, results) => {
-    if (err || results.length === 0) return res.send('Login failed.');
+    if (err || results.length === 0) return res.status(401).json({ error: 'Login failed' });
     const user = results[0];
     bcrypt.compare(password, user.password, (err, match) => {
-      if (!match) return res.send('Wrong password.');
+      if (!match) return res.status(401).json({ error: 'Wrong password' });
+
       req.session.user = { id: user.id, username: user.username, email: user.email };
-      res.redirect('/layout');
+      // Send JSON instead of redirect for API
+      res.json({ success: true, user: { id: user.id, username: user.username, email: user.email } });
     });
   });
 });
+
+app.get('/', (req, res) => {
+  res.redirect('/login'); // Redirect to login page
+});
+
 
 // LAYOUT PAGE
 app.get('/layout', (req, res) => {
   if (!req.session.user) return res.redirect('/login');
   res.render('layout', { uploadedKey: null, fileFound: null });
 });
-
 // Upload a file
 app.post('/upload', upload.single('file'), (req, res) => {
   const { limit } = req.body;
