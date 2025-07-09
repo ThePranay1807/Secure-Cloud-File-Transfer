@@ -27,6 +27,18 @@ app.use(session({
   saveUninitialized: false
 }));
 
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
+
 // MySQL connection
 const db = mysql.createConnection({
   host: 'localhost',
@@ -71,45 +83,147 @@ app.post('/Signup', (req, res) => {
 
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
+  
+  if (!username || !password) {
+    if (req.accepts('html')) {
+      return res.render('login', { error: 'Username and password required' });
+    } else {
+      return res.status(400).json({ error: 'Username and password required' });
+    }
+  }
+
   db.query(`SELECT * FROM users WHERE username = ?`, [username], (err, results) => {
-    if (err || results.length === 0) return res.status(401).json({ error: 'Login failed' });
+    if (err) {
+      console.error('Database error:', err);
+      if (req.accepts('html')) {
+        return res.render('login', { error: 'Database error' });
+      } else {
+        return res.status(500).json({ error: 'Database error' });
+      }
+    }
+
+    if (results.length === 0) {
+      if (req.accepts('html')) {
+        return res.render('login', { error: 'User not found' });
+      } else {
+        return res.status(401).json({ error: 'User not found' });
+      }
+    }
+
     const user = results[0];
     bcrypt.compare(password, user.password, (err, match) => {
-      if (!match) return res.status(401).json({ error: 'Wrong password' });
+      if (err) {
+        console.error('Password comparison error:', err);
+        if (req.accepts('html')) {
+          return res.render('login', { error: 'Authentication error' });
+        } else {
+          return res.status(500).json({ error: 'Authentication error' });
+        }
+      }
 
-      req.session.user = { id: user.id, username: user.username, email: user.email };
-      // Send JSON instead of redirect for API
-      res.json({ success: true, user: { id: user.id, username: user.username, email: user.email } });
+      if (!match) {
+        if (req.accepts('html')) {
+          return res.render('login', { error: 'Wrong password' });
+        } else {
+          return res.status(401).json({ error: 'Wrong password' });
+        }
+      }
+
+      req.session.user = { 
+        id: user.id, 
+        username: user.username, 
+        email: user.email 
+      };
+
+      if (req.accepts('html')) {
+        return res.redirect('/layout');
+      } else {
+        return res.json({
+          success: true,
+          user: { 
+            id: user.id, 
+            username: user.username, 
+            email: user.email 
+          }
+        });
+      }
     });
   });
 });
 
 app.get('/', (req, res) => {
-  res.redirect('/login'); // Redirect to login page
+  res.redirect('/login');
 });
 
-
-// LAYOUT PAGE
 app.get('/layout', (req, res) => {
   if (!req.session.user) return res.redirect('/login');
   res.render('layout', { uploadedKey: null, fileFound: null });
 });
-// Upload a file
-app.post('/upload', upload.single('file'), (req, res) => {
-  const { limit } = req.body;
-  const user = req.session.user;
-  if (!user || !req.file) return res.redirect('/login');
 
-  const secureKey = uuidv4();
-  const sql = `INSERT INTO files (filename, filepath, secure_key, personal_key, download_limit) 
-               VALUES (?, ?, ?, (SELECT personal_key FROM users WHERE id = ?), ?)`;
-  db.query(sql, [req.file.originalname, req.file.filename, secureKey, user.id, limit], (err) => {
-    if (err) return res.send('File upload failed.');
-    res.render('layout', { uploadedKey: secureKey, fileFound: null });
-  });
+// Fixed upload route
+app.post('/upload', upload.single('file'), (req, res) => {
+  try {
+    const { downloadLimit, userId } = req.body;
+    const sessionUser = req.session.user;
+    const finalUserId = sessionUser ? sessionUser.id : userId;
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded.' });
+    }
+
+    if (!finalUserId) {
+      return res.status(400).json({ error: 'Missing userId. Please login again.' });
+    }
+
+    const checkUserSql = 'SELECT personal_key FROM users WHERE id = ?';
+    db.query(checkUserSql, [finalUserId], (err, results) => {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ error: 'Database error: ' + err.message });
+      }
+
+      if (results.length === 0) {
+        return res.status(404).json({ error: 'User not found. Please login again.' });
+      }
+
+      const personalKey = results[0].personal_key;
+      const secureKey = uuidv4();
+      
+      // Validate downloadLimit
+      const validatedDownloadLimit = parseInt(downloadLimit) || 1;
+      if (isNaN(validatedDownloadLimit)) {
+        return res.status(400).json({ error: 'Invalid download limit value' });
+      }
+
+      const insertSql = `
+        INSERT INTO files (filename, filepath, secure_key, personal_key, download_limit)
+        VALUES (?, ?, ?, ?, ?)
+      `;
+
+      db.query(
+        insertSql,
+        [req.file.originalname, req.file.filename, secureKey, personalKey, validatedDownloadLimit],
+        (err2) => {
+          if (err2) {
+            console.error('Insert error:', err2);
+            return res.status(500).json({ error: 'File upload failed: ' + err2.message });
+          }
+
+          return res.json({ 
+            success: true,
+            secureKey: secureKey,
+            filename: req.file.originalname,
+            downloadLimit: validatedDownloadLimit
+          });
+        }
+      );
+    });
+  } catch (error) {
+    console.error('Upload error:', error);
+    return res.status(500).json({ error: 'Upload failed: ' + error.message });
+  }
 });
 
-// Download with secure key
 app.post('/download', (req, res) => {
   const { secure_key } = req.body;
   const sql = `SELECT * FROM files WHERE secure_key = ?`;
@@ -120,7 +234,6 @@ app.post('/download', (req, res) => {
 
     const file = results[0];
 
-    // Check download limit
     if (file.download_limit <= 0) {
       return res.render('layout', {
         uploadedKey: null,
@@ -133,15 +246,13 @@ app.post('/download', (req, res) => {
       return res.send('File not found on server.');
     }
 
-    // Decrease limit by 1
     db.query(`UPDATE files SET download_limit = download_limit - 1 WHERE id = ?`, [file.id], (updateErr) => {
       if (updateErr) return res.send('Failed to update download count.');
-      res.download(filePath, file.filename); // Preserve original filename
+      res.download(filePath, file.filename);
     });
   });
 });
 
-// MULTI-DOWNLOAD PAGE
 app.get('/multi_download', (req, res) => {
   res.render('multi_download', { files: null, fetched: false });
 });
@@ -155,7 +266,6 @@ app.post('/fetch-files', (req, res) => {
   });
 });
 
-//  Updated route: Download selected files with correct filenames
 app.post('/download-selected', (req, res) => {
   const selected = Array.isArray(req.body.selectedFiles)
     ? req.body.selectedFiles
@@ -176,7 +286,7 @@ app.post('/download-selected', (req, res) => {
     results.forEach(file => {
       const fullPath = path.join(__dirname, 'uploads', file.filepath);
       if (fs.existsSync(fullPath)) {
-        archive.file(fullPath, { name: file.filename }); //  Use original filename
+        archive.file(fullPath, { name: file.filename });
       }
     });
 
@@ -184,9 +294,26 @@ app.post('/download-selected', (req, res) => {
   });
 });
 
-// Logout
 app.get('/logout', (req, res) => {
   req.session.destroy(() => res.redirect('/login'));
+});
+
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  
+  if (req.accepts('html')) {
+    res.status(500).render('error', { error: 'Internal server error' });
+  } else {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.use((req, res) => {
+  if (req.accepts('html')) {
+    res.status(404).render('404', { url: req.originalUrl });
+  } else {
+    res.status(404).json({ error: 'Not found' });
+  }
 });
 
 app.listen(port, () => {
